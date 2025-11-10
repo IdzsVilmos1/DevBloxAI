@@ -1,1 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DevBlox AI Controller</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--bg:#0f1113;--card:#222426;--accent:#06aaf5;--text:#e9eef2}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif;display:flex;align-items:flex-start;justify-content:center;padding:40px}
+    .wrap{max-width:760px;width:100%}
+    h1{text-align:center;margin:0 0 18px;font-size:34px}
+    .card{background:var(--card);border-radius:8px;padding:12px;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+    #log{height:340px;overflow:auto;background:#1a1b1c;border-radius:6px;padding:10px;color:#fff}
+    #inputRow{display:flex;margin-top:12px;gap:10px}
+    input[type=text]{flex:1;padding:12px;border-radius:6px;border:0;background:#2a2b2c;color:#fff}
+    button{padding:12px 18px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    .status{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .dot{width:12px;height:12px;border-radius:50%;background:#888;display:inline-block}
+    .dot.green{background:#2ecc71}
+    .small{font-size:13px;color:#cbd5db}
+    .controls{display:flex;gap:8px;align-items:center}
+    .topRow{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .connectBtn{background:#0ea5a3}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>DevBlox AI Controller</h1>
+    <div class="card">
+      <div class="topRow">
+        <div class="status">
+          <span id="dot" class="dot"></span>
+          <div>
+            <div id="statusText" class="small">Not connected</div>
+            <div id="sessionText" class="small" style="opacity:.8"></div>
+          </div>
+        </div>
+        <div class="controls">
+          <form method="POST" action="/logout"><button>Logout</button></form>
+        </div>
+      </div>
 
+      <div id="log"></div>
+
+      <div id="inputRow">
+        <input id="prompt" type="text" placeholder="Írj az AI-nak..." />
+        <button id="sendBtn">Küldés</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
