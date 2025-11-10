@@ -6,33 +6,21 @@
   <style>
     body { background:#0e0f10; color:white; font-family:Arial; display:flex; justify-content:center; align-items:center; height:100vh; }
     .card { background:#181a1b; border-radius:12px; padding:40px; width:380px; text-align:center; box-shadow:0 0 30px rgba(0,0,0,.5); }
-    .avatar { border-radius:50%; width:100px; height:100px; margin-bottom:15px; }
-    button { background:#00a2ff; border:0; border-radius:8px; padding:10px 20px; color:white; font-size:16px; cursor:pointer; }
+    button { background:#00a2ff; border:0; border-radius:8px; padding:12px 24px; color:white; font-size:16px; cursor:pointer; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h2>DevBlox AI Login</h2>
-    <div id="content"></div>
+    <h2>DevBlox AI</h2>
+    <p>Log in to start building with AI</p>
+    <button id="loginBtn">Login</button>
   </div>
   <script>
-    async function loadStatus(){
-      const res = await fetch("/session-status");
+    document.getElementById("loginBtn").onclick = async () => {
+      const res = await fetch("/login", { method:"POST" });
       const data = await res.json();
-      const c = document.getElementById("content");
-      if(!data.connected){
-        c.innerHTML = `<p>Jelentkezz be Roblox fiókkal:</p>
-        <a href="/login"><button>Login with Roblox</button></a>`;
-      } else {
-        c.innerHTML = `
-          <img src="${data.user.avatar}" class="avatar" />
-          <h3>${data.user.name}</h3>
-          <p>Bejelentkezve!</p>
-          <form method="POST" action="/logout"><button>Logout</button></form>
-        `;
-      }
+      if (data.ok) window.location.href = "/dashboard.html";
     }
-    loadStatus();
   </script>
 </body>
 </html>
