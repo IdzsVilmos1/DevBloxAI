@@ -1,117 +1,34 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>DevBlox AI – Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/dashboard.css" />
+  <meta charset="UTF-8">
+  <title>DevBlox AI Dashboard</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Topbar -->
-  <header class="topbar">
-    <div class="left">
-      <div class="logo">🍋<span>DevBlox</span> <em>beta</em></div>
-    </div>
-    <div class="right">
-      <div id="pluginDot" class="dot red"></div>
-      <span id="pluginText" class="muted">Plugin not connected</span>
-      <button class="btn pro">Upgrade to Pro</button>
-
-      <div class="profile">
-        <img id="avatar" src="" alt="avatar" />
-        <div class="menu">
-          <div class="name" id="displayName">–</div>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/plugin.zip" download>Download Plugin</a>
-          <a href="/billing">Billing</a>
-          <form method="POST" action="/logout"><button type="submit">Log Out</button></form>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <div class="layout">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <button id="newProjectBtn" class="btn block">+ New Project</button>
-      <div class="sidetitle">Projects</div>
-      <ul id="projectList" class="projects"></ul>
-    </aside>
-
-    <!-- Main -->
-    <main class="main">
-      <div class="centerHero">
-        <h1>Describe a game mechanic...</h1>
-
-        <div class="heroSearch">
-          <input id="heroPrompt" placeholder="Create a shop GUI with a coin system" />
-          <button id="heroGo" class="go">➜</button>
-        </div>
-
-        <div class="cards">
-          <div class="card"><div class="icon">⏭️</div><div>Clean Start</div></div>
-          <div class="card"><div class="icon">⭐</div><div>Remix Your Favorite Games</div><small class="badge">COMING SOON</small></div>
-          <div class="card"><div class="icon">📈</div><div>Start From Trending Games</div></div>
-        </div>
-      </div>
-
-      <!-- Chat panel -->
-      <div class="chatWrap">
-        <div class="chatHeader">
-          <div class="statusWrap">
-            <div id="connDot" class="dot red"></div>
-            <span id="connText" class="muted">Not connected</span>
-          </div>
-          <div class="actions">
-            <span id="quotaBadge" class="badge">Free 0/10 left</span>
-            <button id="logoutBtn" class="btn">Logout</button>
-          </div>
-        </div>
-
-        <div id="chatLog" class="log"></div>
-
-        <div class="chatInput">
-          <input id="prompt" placeholder="Írj az AI-nak..." />
-          <button id="sendBtn" class="btn primary">Küldés</button>
-        </div>
-      </div>
-    </main>
-  </div>
-
-  <!-- Upgrade modal -->
-  <div id="upgradeModal" class="modal hidden">
-    <div class="modalCard">
-      <div class="plans">
-        <div class="plan">
-          <div class="planTitle">Free Plan</div>
-          <div class="price">$0 <span>/ forever</span></div>
-          <ul>
-            <li>10 prompts per day</li>
-            <li>Basic code generation</li>
-          </ul>
-          <div class="notIncluded">Not included</div>
-          <ul class="muted">
-            <li>150 prompts</li>
-            <li>Faster generation</li>
-            <li>Priority support</li>
-          </ul>
-        </div>
-        <div class="plan pro">
-          <div class="planTitle">Pro Plan <span class="popular">Popular</span></div>
-          <div class="price">$19.99 <span>/ month</span></div>
-          <ul>
-            <li>$20 monthly credits (150 prompts)</li>
-            <li>Faster generation</li>
-            <li>Priority support</li>
-            <li>Access to latest models</li>
-          </ul>
-          <button class="btn pro block">Upgrade to Pro</button>
-        </div>
-      </div>
-      <button id="closeUpgrade" class="close">✕</button>
+  <div class="topbar">
+    <div class="logo">🧠 DevBloxAI</div>
+    <div class="user">
+      <span id="username">Guest</span>
+      <button id="logoutBtn">Logout</button>
     </div>
   </div>
 
-  <script src="/dashboard.js"></script>
+  <div class="container">
+    <div class="inputArea">
+      <input id="prompt" placeholder="Describe a game mechanic..." />
+      <button id="sendBtn">Send</button>
+    </div>
+
+    <div id="responseBox"></div>
+
+    <div class="usage">
+      Free uses left: <span id="usageLeft">10</span>
+      <input id="redeemCode" placeholder="Redeem code..." />
+      <button id="redeemBtn">Redeem</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
