@@ -110,3 +110,21 @@ app.post("/ai", async (req, res) => {
 app.get("/health", (req, res) => res.send("✅ DevBloxAI online"));
 
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
+// --- PLUGIN HEARTBEAT / STATUS ---
+// Ez frissíti a Roblox plugin kapcsolatot
+
+let lastHeartbeat = 0;
+
+app.post("/plugin/heartbeat", (req, res) => {
+  lastHeartbeat = Date.now();
+  console.log("💓 Heartbeat received at", new Date(lastHeartbeat).toLocaleTimeString());
+  res.json({ ok: true });
+});
+
+app.get("/plugin/status", (req, res) => {
+  const diff = Date.now() - lastHeartbeat;
+  const connected = diff < 20000; // 20 másodpercig zöld
+  res.json({ connected });
+});
+
