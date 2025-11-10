@@ -1,79 +1,55 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <title>DevBlox AI Chat</title>
+  <meta charset="utf-8" />
+  <title>DevBlox AI Controller</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: sans-serif; background: #111; color: white; display: flex; flex-direction: column; align-items: center; }
-    #chat { width: 600px; height: 500px; overflow-y: auto; border: 1px solid #333; padding: 10px; background: #222; margin-top: 30px; }
-    input, button { width: 600px; padding: 10px; margin-top: 10px; border-radius: 6px; border: none; }
-    input { background: #333; color: white; }
-    button { background: #00aaff; color: white; cursor: pointer; }
+    :root{--bg:#0f1113;--card:#222426;--accent:#06aaf5;--text:#e9eef2}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif;display:flex;align-items:flex-start;justify-content:center;padding:40px}
+    .wrap{max-width:760px;width:100%}
+    h1{text-align:center;margin:0 0 18px;font-size:34px}
+    .card{background:var(--card);border-radius:8px;padding:12px;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+    #log{height:340px;overflow:auto;background:#1a1b1c;border-radius:6px;padding:10px;color:#fff}
+    #inputRow{display:flex;margin-top:12px;gap:10px}
+    input[type=text]{flex:1;padding:12px;border-radius:6px;border:0;background:#2a2b2c;color:#fff}
+    button{padding:12px 18px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    .status{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .dot{width:12px;height:12px;border-radius:50%;background:#888;display:inline-block}
+    .dot.green{background:#2ecc71}
+    .small{font-size:13px;color:#cbd5db}
+    .controls{display:flex;gap:8px;align-items:center}
+    .topRow{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .connectBtn{background:#0ea5a3}
   </style>
 </head>
 <body>
-  <h1>🤖 DevBlox AI Controller</h1>
-  <div id="chat"></div>
-  <input id="msg" placeholder="Írj az AI-nak..." />
-  <button onclick="send()">Küldés</button>
+  <div class="wrap">
+    <h1>DevBlox AI Controller</h1>
+    <div class="card">
+      <div class="topRow">
+        <div class="status">
+          <span id="dot" class="dot"></span>
+          <div>
+            <div id="statusText" class="small">Not connected</div>
+            <div id="sessionText" class="small" style="opacity:.8"></div>
+          </div>
+        </div>
+        <div class="controls">
+          <a id="loginBtn" href="/login"><button class="connectBtn">Connect Roblox</button></a>
+          <button id="logoutBtn">Logout</button>
+        </div>
+      </div>
 
-  <script>
-    const API_URL = "https://devbloxai.onrender.com"; // <-- A TE szervered
-    let projectId = "studio-link";
-    let sessionId = null;
+      <div id="log"></div>
 
-    async function register() {
-      const res = await fetch(API_URL + "/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId })
-      });
-      const data = await res.json();
-      sessionId = data.sessionId;
-      addMsg("🟢 Csatlakozva a Roblox Studio-hoz! Session: " + sessionId);
-      poll();
-    }
+      <div id="inputRow">
+        <input id="prompt" type="text" placeholder="Írj az AI-nak..." />
+        <button id="sendBtn">Küldés</button>
+      </div>
+    </div>
+  </div>
 
-    function addMsg(text) {
-      const chat = document.getElementById("chat");
-      const div = document.createElement("div");
-      div.textContent = text;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    async function send() {
-      const text = document.getElementById("msg").value;
-      if (!text.trim()) return;
-      addMsg("🧑‍💻 Te: " + text);
-      document.getElementById("msg").value = "";
-
-      const res = await fetch(API_URL + "/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text, projectId, sessionId })
-      });
-      const data = await res.json();
-      if (data.cmd) {
-        addMsg("🤖 AI: " + data.cmd.type + " → futtatás Robloxban...");
-      }
-    }
-
-    async function poll() {
-      while (true) {
-        const res = await fetch(API_URL + "/poll", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId, sessionId })
-        });
-        const data = await res.json();
-        if (data.commands && data.commands.length > 0) {
-          console.log("🧩 Új parancs:", data.commands);
-        }
-        await new Promise(r => setTimeout(r, 2000));
-      }
-    }
-
-    register();
-  </script>
+  <script src="/app.js"></script>
 </body>
 </html>
