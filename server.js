@@ -7,6 +7,7 @@ import { v4 as uuid } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import { google } from "googleapis";
 
 dotenv.config();
 
@@ -18,21 +19,23 @@ app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 
-// ---- CONFIG from env ----
 const PORT = process.env.PORT || 10000;
-const GEMINI_KEY = process.env.GEMINI_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
-// OAuth config (configure these in your hosting secrets)
-const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || "";
-const OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || "";
-const OAUTH_CALLBACK = process.env.OAUTH_CALLBACK || "";
-const OAUTH_AUTHORIZE_URL = process.env.OAUTH_AUTHORIZE_URL || ""; // e.g. "https://www.roblox.com/oauth/authorize"
-const OAUTH_TOKEN_URL = process.env.OAUTH_TOKEN_URL || "";         // e.g. "https://www.roblox.com/oauth/token"
-const OAUTH_SCOPES = process.env.OAUTH_SCOPES || "openid profile"; // set appropriate scopes
+// ---- Roblox OAuth Config ----
+const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID;
+const OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET;
+const OAUTH_CALLBACK = process.env.OAUTH_CALLBACK;
+const OAUTH_AUTHORIZE_URL = "https://apis.roblox.com/oauth/v1/authorize";
+const OAUTH_TOKEN_URL = "https://apis.roblox.com/oauth/v1/token";
+const OAUTH_USERINFO_URL = "https://apis.roblox.com/oauth/v1/userinfo";
+const OAUTH_SCOPES = "openid profile";
 
-// In-memory store (simple). Production: használj DB-t vagy Redis-t.
-const SESSIONS = new Map(); // sessionId -> { oauthToken, oauthRefresh, profile, created }
+// ---- Google Sheets ----
+const GOOGLE_SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
+
+// ---- In-memory sessions ----
+const SESSIONS = new Map();
 
 function createSession(obj = {}) {
   const id = uuid();
@@ -40,44 +43,63 @@ function createSession(obj = {}) {
   return id;
 }
 
-// Serve static UI
+// ---- Google Sheets Helper ----
+async function writeToSheet(username) {
+  if (!GOOGLE_SERVICE_ACCOUNT_JSON || !GOOGLE_SHEET_ID) {
+    console.log("⚠️ Google Sheets nincs konfigurálva");
+    return;
+  }
+
+  const creds = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
+  const auth = new google.auth.GoogleAuth({
+    credentials: creds,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+  const sheets = google.sheets({ version: "v4", auth });
+
+  const appendReq = {
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: "A:A",
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    resource: { values: [[username]] },
+  };
+
+  await sheets.spreadsheets.values.append(appendReq);
+  console.log(`🟢 Mentve a Google Sheet-be: ${username}`);
+}
+
+// ---- Static UI ----
 app.use(express.static(path.join(__dirname, "public")));
 
-// ---- OAuth: redirect to provider ----
+// ---- Login redirect ----
 app.get("/login", (req, res) => {
-  // create a short session and store a state token
   const state = uuid();
   const sessionId = createSession({ state });
-  // set a cookie so browser keeps sessionId
   res.cookie("sess", sessionId, { httpOnly: true, sameSite: "lax" });
 
-  // build authorization URL
   const params = new URLSearchParams({
     client_id: OAUTH_CLIENT_ID,
     redirect_uri: OAUTH_CALLBACK,
     response_type: "code",
     scope: OAUTH_SCOPES,
-    state
+    state,
   });
-  const url = `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
-  return res.redirect(url);
+
+  res.redirect(`${OAUTH_AUTHORIZE_URL}?${params.toString()}`);
 });
 
-// ---- OAuth callback ----
+// ---- Callback ----
 app.get("/oauth/callback", async (req, res) => {
   const { code, state } = req.query;
-  const sessionId = req.cookies?.sess;
-  if (!sessionId || !SESSIONS.has(sessionId)) {
-    return res.status(400).send("Session missing.");
-  }
-  const sess = SESSIONS.get(sessionId);
-  if (!state || state !== sess.state) {
-    return res.status(400).send("Invalid state.");
-  }
-  if (!code) return res.status(400).send("No code returned.");
+  const sessId = req.cookies?.sess;
+  if (!sessId || !SESSIONS.has(sessId)) return res.status(400).send("Invalid session");
+
+  const sess = SESSIONS.get(sessId);
+  if (sess.state !== state) return res.status(400).send("Invalid state");
 
   try {
-    // Exchange code for token
+    // Token exchange
     const tokenRes = await fetch(OAUTH_TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -86,118 +108,57 @@ app.get("/oauth/callback", async (req, res) => {
         code,
         redirect_uri: OAUTH_CALLBACK,
         client_id: OAUTH_CLIENT_ID,
-        client_secret: OAUTH_CLIENT_SECRET
-      })
+        client_secret: OAUTH_CLIENT_SECRET,
+      }),
     });
+    const tokens = await tokenRes.json();
+    sess.tokens = tokens;
 
-    if (!tokenRes.ok) {
-      const text = await tokenRes.text();
-      console.error("Token exchange failed:", tokenRes.status, text);
-      return res.status(500).send("Token exchange failed.");
-    }
+    // Fetch user info
+    const infoRes = await fetch(OAUTH_USERINFO_URL, {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    const user = await infoRes.json();
 
-    const tokenJson = await tokenRes.json();
-    // tokenJson expected: access_token, refresh_token, expires_in, etc.
-    sess.oauth = tokenJson;
-    SESSIONS.set(sessionId, sess);
+    sess.user = {
+      name: user.name,
+      avatar: user.picture,
+      sub: user.sub,
+    };
+    SESSIONS.set(sessId, sess);
 
-    // Optionally fetch user profile from provider (if provider offers endpoint)
-    // For Roblox you might have an endpoint to get current user; configure PROFILE_URL as env if desired.
+    await writeToSheet(user.name);
 
-    // redirect back to frontend app
-    return res.redirect("/");
+    res.redirect("/");
   } catch (err) {
     console.error(err);
-    return res.status(500).send("OAuth callback error.");
+    res.status(500).send("OAuth callback error");
   }
 });
 
-// ---- session status endpoint (used by client js) ----
+// ---- Status ----
 app.get("/session-status", (req, res) => {
-  const sessionId = req.cookies?.sess;
-  if (!sessionId) return res.json({ connected: false });
-  const sess = SESSIONS.get(sessionId);
-  if (!sess) return res.json({ connected: false });
-  // return minimal info
-  return res.json({ connected: !!sess.oauth, sessionId, info: { created: sess.created } });
+  const sessId = req.cookies?.sess;
+  if (!sessId || !SESSIONS.has(sessId)) return res.json({ connected: false });
+  const sess = SESSIONS.get(sessId);
+  res.json({
+    connected: !!sess.user,
+    user: sess.user || null,
+  });
 });
 
-// ---- logout
 app.post("/logout", (req, res) => {
-  const sessionId = req.cookies?.sess;
-  if (sessionId) {
-    SESSIONS.delete(sessionId);
+  const sessId = req.cookies?.sess;
+  if (sessId) {
+    SESSIONS.delete(sessId);
     res.clearCookie("sess");
   }
   res.json({ ok: true });
 });
 
-// ---- AI endpoint (example, keep your existing logic) ----
-app.post("/ai", async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: "missing prompt" });
-  if (!GEMINI_KEY) return res.status(500).json({ error: "no GEMINI_KEY configured" });
-
-  try {
-    const aiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: `You are an assistant controlling Roblox Studio. Respond only in JSON.\nRequest: ${prompt}` }
-              ]
-            }
-          ]
-        })
-      }
-    );
-
-    const json = await aiRes.json();
-    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(json);
-    return res.json({ ok: true, raw: json, text });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "AI error", detail: err.message });
-  }
-});
-
-// ---- keep your other API endpoints too (register/poll/push) if needed ----
-app.post("/register", (req, res) => {
-  // minimal example: return session id
-  const sessionId = createSession({ queue: [] });
-  res.json({ sessionId });
-});
-
-app.post("/poll", async (req, res) => {
-  // simple poll impl for plugin (you can expand)
-  const { sessionId } = req.body;
-  const sess = SESSIONS.get(sessionId);
-  if (!sess) return res.status(404).json({ error: "session not found" });
-  const cmds = sess.queue?.splice(0) || [];
-  res.json({ commands: cmds });
-});
-
-app.post("/push", (req, res) => {
-  const { sessionId, type, payload } = req.body;
-  const sess = SESSIONS.get(sessionId);
-  if (!sess) return res.status(404).json({ error: "session not found" });
-  sess.queue = sess.queue || [];
-  const cmd = { id: uuid(), type, payload, ts: Date.now() };
-  sess.queue.push(cmd);
-  res.json({ ok: true });
-});
-
-// fallback: serve index for SPA routes
+// ---- fallback ----
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// start
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`✅ Static public at ${path.join(__dirname, "public")}`);
-});
+app.listen(PORT, () => console.log(`✅ DevBloxAI running on port ${PORT}`));
