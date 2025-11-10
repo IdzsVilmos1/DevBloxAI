@@ -1,0 +1,14 @@
+body { background:#0e0f10; color:white; font-family:Arial; margin:0; }
+.topbar { background:#181a1b; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; }
+.logo { font-weight:bold; font-size:18px; color:#00a2ff; }
+.container { padding:20px; max-width:800px; margin:auto; }
+.inputArea { display:flex; gap:10px; }
+.inputArea input { flex:1; padding:12px; border:0; border-radius:8px; background:#202224; color:white; }
+.inputArea button { padding:12px 24px; border:0; border-radius:8px; background:#00a2ff; color:white; cursor:pointer; }
+.msg { background:#202224; padding:10px; border-radius:8px; margin-top:10px; }
+.msg.user { background:#0066cc; }
+.msg.ai { background:#2d2e30; }
+.msg.error { background:#992222; }
+.usage { margin-top:15px; display:flex; gap:10px; align-items:center; }
+.usage input { flex:1; padding:8px; border:0; border-radius:6px; background:#202224; color:white; }
+.usage button { padding:8px 16px; border:0; border-radius:6px; background:#00a2ff; color:white; }
