@@ -1,4 +1,28 @@
 /* DevBlox AI – Dashboard logic */
+
+// --- Plugin status sync ---
+async function checkPluginStatus() {
+  try {
+    const res = await fetch("/plugin/status");
+    const data = await res.json();
+    const indicator = document.querySelector("#pluginStatus");
+    if (!indicator) return;
+
+    if (data.connected) {
+      indicator.textContent = "🟢 Plugin connected";
+      indicator.style.color = "#00ff88";
+    } else {
+      indicator.textContent = "🔴 Plugin not connected";
+      indicator.style.color = "#ff5555";
+    }
+  } catch {
+    console.warn("status check failed");
+  }
+}
+setInterval(checkPluginStatus, 3000);
+checkPluginStatus();
+
+
 const chat = document.getElementById('chat');
 const promptInput = document.getElementById('promptInput');
 const promptBottom = document.getElementById('promptBottom');
