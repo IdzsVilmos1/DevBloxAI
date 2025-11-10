@@ -1,34 +1,183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>DevBlox AI Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <title>DevBlox AI — Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/dashboard.css" />
 </head>
 <body>
-  <div class="topbar">
-    <div class="logo">🧠 DevBloxAI</div>
-    <div class="user">
-      <span id="username">Guest</span>
-      <button id="logoutBtn">Logout</button>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">🤖</div>
+      <div class="brand-text">
+        <div class="name">DevBlox</div>
+        <div class="sub">AI Studio</div>
+      </div>
+    </div>
+
+    <button class="btn primary w-full" id="newProjectBtn">+ New Project</button>
+
+    <div class="nav-section">
+      <div class="nav-title">Projects</div>
+      <ul class="project-list" id="projectList">
+        <li class="project-item active">
+          <span class="dot"></span> New Project
+        </li>
+      </ul>
+    </div>
+
+    <a class="discord" href="https://discord.com" target="_blank" rel="noopener">
+      <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/discord.svg" alt="Discord"/>
+      <span>Join for gifts</span>
+    </a>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="status">
+        <span class="plug-dot" id="pluginDot"></span>
+        <span id="pluginText">Plugin not connected</span>
+      </div>
+
+      <div class="top-actions">
+        <button class="btn ghost" id="usesBadge">Free 10/10 left</button>
+        <button class="btn success" id="upgradeBtn">Upgrade to Pro</button>
+
+        <div class="profile" id="profileMenu">
+          <img id="avatar" src="https://tr.rbxcdn.com/30DAY-AvatarHeadshot-420x420.png" alt="pfp"/>
+          <span id="username">Guest</span>
+          <div class="menu" id="profileDropdown">
+            <button class="menu-item" data-open="settingsModal">Profile Settings</button>
+            <button class="menu-item" data-open="billingModal">Billing</button>
+            <a class="menu-item" href="/logout">Log out</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero / Prompt row -->
+    <section class="hero">
+      <div class="headline">Describe a game mechanic...</div>
+      <div class="prompt-wrap">
+        <input id="promptInput" class="prompt" placeholder="Create a shop GUI with a coin system" />
+        <button id="sendBtn" class="btn primary icon">➜</button>
+      </div>
+      <div class="starter-cards">
+        <button class="card" data-template="Clean Start">Clean Start</button>
+        <button class="card disabled">Remix Your Favorite Games <span class="pill">Coming Soon</span></button>
+        <button class="card">Start From Trending Games</button>
+      </div>
+    </section>
+
+    <!-- Chat Area -->
+    <section class="chat" id="chat">
+      <!-- bubbles will render here -->
+    </section>
+
+    <!-- Bottom input bar (sticky) -->
+    <footer class="composer">
+      <div class="left">
+        <button class="tool" title="Ideas">💡</button>
+        <button class="tool" title="Assets">📦</button>
+        <button class="tool" title="Images">🖼️</button>
+        <button class="tool" title="Settings">⚙️</button>
+      </div>
+      <input id="promptBottom" class="composer-input" placeholder="Írj az AI-nak…" />
+      <div class="right">
+        <button class="badge" id="usesBadgeBottom">Free 10/10</button>
+        <button id="sendBottom" class="btn primary">Send</button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Modals -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Profile Settings</h3>
+        <button class="x" data-close>&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <label>Display name</label>
+          <input id="setDisplayName" placeholder="Your name" />
+        </div>
+        <div class="row">
+          <label>Avatar URL</label>
+          <input id="setAvatarUrl" placeholder="https://..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn ghost" data-close>Close</button>
+        <button class="btn primary" id="saveProfile">Save</button>
+      </div>
     </div>
   </div>
 
-  <div class="container">
-    <div class="inputArea">
-      <input id="prompt" placeholder="Describe a game mechanic..." />
-      <button id="sendBtn">Send</button>
-    </div>
+  <div class="modal-overlay" id="billingModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Billing</h3>
+        <button class="x" data-close>&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="plan">
+          <div class="plan-box free">
+            <div class="title">Free Plan</div>
+            <div class="price">$0 / forever</div>
+            <ul>
+              <li>10 prompts per day</li>
+              <li>Basic code generation</li>
+            </ul>
+          </div>
+          <div class="plan-box pro">
+            <div class="title">Pro Plan</div>
+            <div class="price">$19.99 / month</div>
+            <ul>
+              <li>150 prompts</li>
+              <li>Faster generation</li>
+              <li>Access to latest models</li>
+            </ul>
+            <button class="btn success" id="upgradeBtn2">Upgrade to Pro</button>
+          </div>
+        </div>
 
-    <div id="responseBox"></div>
-
-    <div class="usage">
-      Free uses left: <span id="usageLeft">10</span>
-      <input id="redeemCode" placeholder="Redeem code..." />
-      <button id="redeemBtn">Redeem</button>
+        <div class="redeem">
+          <label>Redeem code</label>
+          <div class="redeem-row">
+            <input id="redeemCode" placeholder="Enter code (hint: admin)" />
+            <button class="btn primary" id="redeemBtn">Apply</button>
+          </div>
+          <p class="small">A sikeres beváltás +100 használatot ad.</p>
+          <div class="redeem-msg" id="redeemMsg"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn ghost" data-close>Close</button>
+      </div>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <div class="modal-overlay" id="upgradeModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Upgrade to Pro</h3>
+        <button class="x" data-close>&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Unlock faster responses, 150 prompts / month, and access to latest models.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn ghost" data-close>Not now</button>
+        <button class="btn success" id="goPro">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/dashboard.js"></script>
 </body>
 </html>
