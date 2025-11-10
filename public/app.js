@@ -1,64 +1,42 @@
-// public/app.js
-async function qs(s){return document.querySelector(s)}
-const dot = await qs("#dot");
-const statusText = await qs("#statusText");
-const sessionText = await qs("#sessionText");
-const logEl = await qs("#log");
-const sendBtn = await qs("#sendBtn");
-const promptInput = await qs("#prompt");
-const logoutBtn = await qs("#logoutBtn");
-const loginBtn = await qs("#loginBtn");
-
-function appendLine(txt){
-  const p = document.createElement("div");
-  p.textContent = txt;
-  logEl.appendChild(p);
-  logEl.scrollTop = logEl.scrollHeight;
+async function loadSession(){
+  const res = await fetch("/session");
+  const data = await res.json();
+  if(!data.logged) location.href = "/";
+  document.getElementById("username").innerText = data.user.name;
+  document.getElementById("usageLeft").innerText = 10 - (data.user.uses || 0);
 }
 
-async function refreshStatus(){
-  try{
-    const r = await fetch("/session-status");
-    const j = await r.json();
-    if(j.connected){
-      dot.classList.add("green");
-      statusText.textContent = "Csatlakozva a Roblox Studio-hoz!";
-      sessionText.textContent = `Session: ${j.sessionId || "—"}`;
-      appendLine("• connected: " + (j.sessionId || ""));
-    } else {
-      dot.classList.remove("green");
-      statusText.textContent = "Nem csatlakozott";
-      sessionText.textContent = "";
-    }
-  } catch(e){
-    dot.classList.remove("green");
-    statusText.textContent = "Hálózati hiba";
-  }
-}
-
-refreshStatus();
-setInterval(refreshStatus, 8000);
-
-sendBtn.addEventListener("click", async () => {
-  const prompt = promptInput.value.trim();
+async function sendPrompt(){
+  const inp = document.getElementById("prompt");
+  const resBox = document.getElementById("responseBox");
+  const prompt = inp.value.trim();
   if(!prompt) return;
-  appendLine("Te: " + prompt);
-  promptInput.value = "";
-  try {
-    const r = await fetch("/ai", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({prompt})
-    });
-    const j = await r.json();
-    appendLine("AI: " + (j.text || JSON.stringify(j).slice(0,300)));
-  } catch (err) {
-    appendLine("Hiba: " + err.message);
+  inp.value = "";
+  resBox.innerHTML += `<div class='msg user'>${prompt}</div>`;
+  const r = await fetch("/ai", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ prompt }) });
+  const data = await r.json();
+  if(data.error){
+    resBox.innerHTML += `<div class='msg error'>${data.error}</div>`;
+  } else {
+    resBox.innerHTML += `<div class='msg ai'>${data.reply}</div>`;
+    document.getElementById("usageLeft").innerText = data.remaining;
   }
-});
+  resBox.scrollTop = resBox.scrollHeight;
+}
 
-logoutBtn.addEventListener("click", async () => {
-  await fetch("/logout", { method: "POST" });
-  await refreshStatus();
-});
+async function redeemCode(){
+  const code = document.getElementById("redeemCode").value.trim();
+  const res = await fetch("/redeem", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ code }) });
+  const data = await res.json();
+  alert(data.msg || "Unknown response");
+  loadSession();
+}
 
+document.getElementById("sendBtn").onclick = sendPrompt;
+document.getElementById("redeemBtn").onclick = redeemCode;
+document.getElementById("logoutBtn").onclick = async () => {
+  await fetch("/logout", { method:"POST" });
+  location.href = "/";
+};
+
+loadSession();
