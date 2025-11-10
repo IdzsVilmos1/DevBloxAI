@@ -1,4 +1,4 @@
-// DevBlox AI Server v3.1
+// server.js — DevBloxAI v2.1
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,8 +6,7 @@ import fetch from "node-fetch";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
-import { google } from "googleapis";
-import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
 
 dotenv.config();
 
@@ -18,171 +17,96 @@ app.use(express.json());
 app.use(cors());
 app.use(cookieParser());
 
+// === Állapot mentés (session + használat) ===
+const usersFile = "./users.json";
+let users = {};
+if (fs.existsSync(usersFile)) {
+  users = JSON.parse(fs.readFileSync(usersFile));
+}
+function saveUsers() {
+  fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+}
+
+// === statikus fájlok ===
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 
-// === LOGIN MOCK ===
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-app.get("/login", (req, res) => {
-  const clientId = process.env.OAUTH_CLIENT_ID;
-  const redirect = process.env.REDIRECT_URL;
-  const url = `https://apis.roblox.com/oauth/v1/authorize?client_id=${clientId}&response_type=code&scope=openid%20profile&redirect_uri=${redirect}`;
-  res.redirect(url);
-});
-app.get("/session-status", (req, res) => {
-  res.json({
-    connected: true,
-    user: {
-      name: "TesztFelhasználó",
-      avatar: "https://tr.rbxcdn.com/30DAY-AvatarHeadshot-420x420.png",
-    },
-  });
+// === fake login rendszer ===
+app.post("/login", (req, res) => {
+  const id = "user_" + Date.now();
+  users[id] = users[id] || { name: "Guest_" + Math.floor(Math.random() * 9999), uses: 0 };
+  saveUsers();
+  res.cookie("session", id, { httpOnly: false });
+  res.json({ ok: true, user: users[id] });
 });
 
-// =========================================================
-// === 🧠 UNIVERSAL AI HANDLER ==============================
-let lastCode = null;
+app.post("/logout", (req, res) => {
+  res.clearCookie("session");
+  res.json({ ok: true });
+});
 
+app.get("/session", (req, res) => {
+  const id = req.cookies.session;
+  if (!id || !users[id]) return res.json({ logged: false });
+  res.json({ logged: true, user: users[id] });
+});
+
+// === használat számláló + admin kód ===
+app.post("/redeem", (req, res) => {
+  const id = req.cookies.session;
+  const code = (req.body.code || "").trim().toLowerCase();
+  if (!id || !users[id]) return res.status(401).json({ error: "Not logged in" });
+  if (code === "admin") {
+    users[id].uses = Math.max(0, users[id].uses - 100);
+    saveUsers();
+    return res.json({ ok: true, msg: "+100 usage unlocked!" });
+  }
+  res.json({ ok: false, msg: "Invalid code" });
+});
+
+// === AI végpont (OpenAI API) ===
 app.post("/ai", async (req, res) => {
+  const id = req.cookies.session;
+  if (!id || !users[id]) return res.status(401).json({ error: "Not logged in" });
+
+  const user = users[id];
+  if (user.uses >= 10) return res.json({ error: "Usage limit reached (10/day)" });
+
   const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: "Hiányzik a prompt!" });
+  if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          {
-            role: "system",
-            content: `
-Te egy fejlett Roblox AI fejlesztő asszisztens vagy.
-A felhasználó bármit kérhet, ami Roblox Studio-ban létrehozható vagy scriptelhető:
-- GUI elemek (ScreenGui, Frame, TextLabel, ImageButton, stb.)
-- Workspace objectek (Part, MeshPart, Model, Light, ParticleEmitter, stb.)
-- Animációk, tweenek, mozgás, pathfinding
-- Interaktív rendszerek (ajtó, bolt, inventory, UI)
-- Fegyver, NPC, AI, hangok, effektek
-- Sőt, teljes rendszerek: quest, wave, crafting stb.
-
-Mindig az alábbi formátumban válaszolj:
-
-🧩 **Leírás (Amilyen nyelven kérték tőled)** — röviden mit fog csinálni  
-🧱 **CREATE:** objektumok, amiket létre kell hozni  
-⚙️ **SET:** property-k, pozíciók, színek, tween stb.  
-📜 **LUA:** Lua / Luau script (kommentekkel magyarul)  
-
-Formátum példa:
----
-🧩 Leírás: Készítek egy ajtót, ami kinyílik, ha a player rákattint.
-
--- CREATE:
-Part "Door"
-ClickDetector "Click"
-Script "DoorScript"
-
--- SET:
-Door.Position = Vector3.new(0,5,0)
-Door.Anchored = true
-Door.Size = Vector3.new(4,8,1)
-Door.Color = Color3.fromRGB(120,80,40)
-
--- LUA:
-local door = script.Parent
-local click = door:WaitForChild("Click")
-click.MouseClick:Connect(function()
-    local TweenService = game:GetService("TweenService")
-    local tween = TweenService:Create(door, TweenInfo.new(1), {CFrame = door.CFrame * CFrame.Angles(0, math.rad(90), 0)})
-    tween:Play()
-end)
----
-Mindig ebben a formában adj választ.
-`
-          },
-          { role: "user", content: prompt },
+          { role: "system", content: "You are DevBloxAI, an advanced Roblox development assistant. Reply with both explanation and Lua code if needed." },
+          { role: "user", content: prompt }
         ],
         temperature: 0.6,
-        max_tokens: 1000,
-      }),
+        max_tokens: 600
+      })
     });
+    const data = await r.json();
+    const reply = data.choices?.[0]?.message?.content || "⚠️ No reply.";
 
-    const data = await response.json();
-    const code = data.choices?.[0]?.message?.content || "-- Nincs AI válasz --";
-    lastCode = code;
-    res.json({ success: true, code });
+    user.uses++;
+    saveUsers();
+
+    res.json({ success: true, reply, remaining: 10 - user.uses });
   } catch (err) {
-    console.error("AI API hiba:", err);
-    res.status(500).json({ error: "AI feldolgozás hiba." });
+    console.error(err);
+    res.status(500).json({ error: "AI request failed" });
   }
 });
 
-// Plugin poll (Roblox studio lekérés)
-app.get("/ai-poll", (req, res) => {
-  if (lastCode) {
-    res.json({ code: lastCode });
-    lastCode = null;
-  } else {
-    res.json({});
-  }
-});
+// === healthcheck ===
+app.get("/health", (req, res) => res.send("✅ DevBloxAI online"));
 
-// =========================================================
-// === DAILY USAGE LIMIT (10 free) ==========================
-function getOrSetUID(req, res) {
-  let uid = req.cookies?.db_uid;
-  if (!uid) {
-    uid = uuidv4();
-    res.cookie("db_uid", uid, { httpOnly: true, sameSite: "lax", maxAge: 1000*60*60*24*365 });
-  }
-  return uid;
-}
-const USAGE = new Map();
-function today() { return new Date().toISOString().slice(0,10); }
-
-app.get("/usage", (req, res) => {
-  const uid = getOrSetUID(req, res);
-  const u = USAGE.get(uid);
-  if (!u || u.date !== today()) return res.json({ used: 0 });
-  res.json({ used: u.used });
-});
-app.post("/usage/use", (req, res) => {
-  const uid = getOrSetUID(req, res);
-  const amt = Math.max(1, Number(req.body?.amount || 1));
-  let u = USAGE.get(uid);
-  if (!u || u.date !== today()) u = { date: today(), used: 0 };
-  if (u.used + amt > 10) return res.status(429).json({ error: "Daily quota exceeded" });
-  u.used += amt;
-  USAGE.set(uid, u);
-  res.json({ used: u.used });
-});
-
-// =========================================================
-// === PLUGIN STATUS (heartbeat) ===========================
-let PLUGIN_LAST = 0;
-app.post("/plugin/heartbeat", (req, res) => {
-  PLUGIN_LAST = Date.now();
-  res.json({ ok: true });
-});
-app.get("/plugin/status", (req, res) => {
-  const alive = Date.now() - PLUGIN_LAST < 20000;
-  res.json({ connected: alive });
-});
-
-// =========================================================
-// === PROJECTS =============================================
-const PROJECTS = [{ id: "p1", name: "New Project" }];
-app.get("/projects", (req, res) => res.json(PROJECTS));
-app.post("/projects", (req, res) => {
-  const id = uuidv4();
-  const name = req.body?.name || "Untitled";
-  PROJECTS.push({ id, name });
-  res.json({ id, name });
-});
-
-// =========================================================
-app.listen(PORT, () => console.log(`✅ DevBlox AI running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
