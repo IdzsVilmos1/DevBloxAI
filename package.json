@@ -1,15 +1,16 @@
 {
-  "name": "devblox-ai-server",
+  "name": "devbloxai-server",
   "version": "1.0.0",
-  "description": "AI backend for Roblox Studio plugin (Gemini 1.5)",
-  "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "uuid": "^9.0.1",
-    "node-fetch": "^3.3.2"
+    "express": "^4.18.2",
+    "node-fetch": "^3.4.1",
+    "uuid": "^9.0.0",
+    "dotenv": "^16.0.3"
   }
 }
