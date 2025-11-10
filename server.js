@@ -1,119 +1,121 @@
+// server.js — DevBlox AI Server (v2.0)
 import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
-import cookieParser from "cookie-parser";
-import { v4 as uuid } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
+import fetch from "node-fetch";
+import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { google } from "googleapis";
+import { v4 as uuidv4 } from "uuid";
+
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
-app.use(cors());
+const PORT = process.env.PORT || 10000;
+
+// 🔹 Alapbeállítások
 app.use(express.json());
+app.use(cors());
 app.use(cookieParser());
 
-const PORT = process.env.PORT || 10000;
-const FAKE_LOGIN_ENABLED = true;
-
-const SESSIONS = new Map();
-
-// 📊 Google Sheets setup
-let sheets;
-try {
-  const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-  const client = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-  sheets = google.sheets({ version: "v4", auth: client });
-  console.log("✅ Google Sheets API initialized");
-} catch (err) {
-  console.error("⚠️ Google Sheets init failed:", err.message);
-}
-
-// ✏️ Helper to add a user
-async function addUserToSheet(name, avatar) {
-  if (!sheets) return;
-  try {
-    const now = new Date().toLocaleString("hu-HU");
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "A1",
-      valueInputOption: "RAW",
-      requestBody: {
-        values: [[name, avatar, now]],
-      },
-    });
-    console.log(`📝 Added user to sheet: ${name}`);
-  } catch (err) {
-    console.error("❌ Sheet append failed:", err.message);
-  }
-}
-
-// 📦 Sessions
-function createSession(obj = {}) {
-  const id = uuid();
-  SESSIONS.set(id, { ...obj, created: Date.now() });
-  return id;
-}
-
-// 🗂️ Static
+// 📁 Statikus fájlok (frontend)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 
-// 🔑 LOGIN (FAKE)
-app.get("/login", async (req, res) => {
-  if (FAKE_LOGIN_ENABLED) {
-    const user = {
-      name: "DevBlox Tester",
-      avatar: "https://tr.rbxcdn.com/30DAY-Avatar.png",
-    };
-    const sid = createSession({ user });
-    res.cookie("sess", sid, { httpOnly: true, sameSite: "lax" });
-
-    await addUserToSheet(user.name, user.avatar);
-
-    console.log("🧩 Fake login → DevBlox Tester");
-    return res.redirect("/dashboard");
-  }
-
-  res.redirect("/oauth-not-ready");
-});
-
-// 👤 Session info
-app.get("/session-status", (req, res) => {
-  const sessId = req.cookies?.sess;
-  if (!sessId || !SESSIONS.has(sessId)) return res.json({ connected: false });
-  const sess = SESSIONS.get(sessId);
-  return res.json({ connected: !!sess.user, user: sess.user });
-});
-
-// 📊 Dashboard
-app.get("/dashboard", (req, res) => {
-  const sessId = req.cookies?.sess;
-  if (!sessId || !SESSIONS.has(sessId)) return res.redirect("/");
-  const sess = SESSIONS.get(sessId);
-  if (!sess.user) return res.redirect("/");
-  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-// 🚪 Logout
-app.post("/logout", (req, res) => {
-  const sessId = req.cookies?.sess;
-  if (sessId) {
-    SESSIONS.delete(sessId);
-    res.clearCookie("sess");
-  }
-  return res.json({ ok: true });
-});
-
-// Default
-app.get("*", (req, res) => {
+// 🌐 Fő oldal
+app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, () => console.log(`✅ DevBloxAI running on port ${PORT}`));
+// --- ROBLOX OAUTH + BEJELENTKEZÉS ---
+// (Ez majd akkor aktív, ha a Roblox app engedélyezett)
+app.get("/login", (req, res) => {
+  const clientId = process.env.OAUTH_CLIENT_ID;
+  const redirect = process.env.REDIRECT_URL;
+  const url = `https://apis.roblox.com/oauth/v1/authorize?client_id=${clientId}&response_type=code&scope=openid%20profile&redirect_uri=${redirect}`;
+  res.redirect(url);
+});
+
+// 🌍 SESSION STÁTUSZ
+app.get("/session-status", (req, res) => {
+  // Teszt módban még nincs valódi Roblox login
+  res.json({
+    connected: true,
+    user: {
+      name: "TesztFelhasználó",
+      avatar: "https://tr.rbxcdn.com/30DAY-AvatarHeadshot-420x420.png"
+    }
+  });
+});
+
+// --- AI ENDPOINT (OpenAI hívás) ---
+app.post("/ai", async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ error: "Hiányzik a prompt!" });
+  }
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Te egy Roblox fejlesztő AI vagy. Csak LUA kódot írj, magyar kommentekkel, magyarázat nélkül."
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.6,
+        max_tokens: 800
+      })
+    });
+
+    const data = await response.json();
+    const aiReply = data.choices?.[0]?.message?.content || "⚠️ Nem jött válasz az AI-tól.";
+
+    res.json({ success: true, code: aiReply });
+  } catch (err) {
+    console.error("AI API hiba:", err);
+    res.status(500).json({ error: "AI feldolgozás hiba." });
+  }
+});
+
+// --- HEALTH CHECK (Renderhez) ---
+app.get("/health", (req, res) => {
+  res.send("✅ Server online");
+});
+
+// --- GOOGLE SHEETS (opcionális logolás) ---
+async function logToGoogleSheet(username) {
+  try {
+    const auth = new google.auth.GoogleAuth({
+      credentials: JSON.parse(process.env.GOOGLE_SERVICE_KEY),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+    });
+
+    const sheets = google.sheets({ version: "v4", auth });
+    const spreadsheetId = process.env.SHEET_ID;
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: "A:A",
+      valueInputOption: "RAW",
+      requestBody: { values: [[username]] }
+    });
+  } catch (err) {
+    console.warn("Nem sikerült logolni Google Sheets-be:", err.message);
+  }
+}
+
+// --- INDÍTÁS ---
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
