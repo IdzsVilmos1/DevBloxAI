@@ -110,6 +110,8 @@ function bubble(who, text, code) {
 /* ---------- send logic ---------- */
 async function send(text) {
   if (!text || !text.trim()) return;
+    promptInput.value = "";
+    promptBottom.value = "";
 
   // usage gate
   if (usage.left <= 0) {
