@@ -87,7 +87,13 @@ body{
 .pill{margin-left:8px; background:#21303d; color:#9dd4ff; border-radius:9999px; padding:2px 8px; font-size:11px}
 
 /* Chat bubbles */
-.chat{padding:14px 24px 140px; display:flex; flex-direction:column; gap:12px}
+.chat{
+  padding:60px 24px 140px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  align-items:center;
+}
 .bubble{
   max-width:980px; border:var(--border); border-radius:16px; padding:14px 16px;
   background:var(--panel-2); box-shadow:var(--shadow); line-height:1.5;
